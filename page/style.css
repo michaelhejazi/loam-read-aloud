@@ -1,0 +1,348 @@
+/* Read aloud: the turn line with one quiet speaker at its right end, the turn
+ * line's own ink and size of target — present, never loud. A glyph whose player
+ * is open holds the turn line's open colour; one whose menu is open, the hover
+ * fill. The menu is the composer's popover card and rows, anchored to the
+ * glyph's right edge: above it, or below it near the top of the screen.
+ *
+ * Its width is its words', between 260px and the screen less the thread's
+ * gutters, and it opens leftward into the thread. Two classes on purpose:
+ * `.popover`, further down and as specific as `.speakmenu` alone, otherwise puts
+ * back `left: 0` and `max-width: calc(100% - 8px)` — and 100% here is the
+ * glyph's own 30px box, which is how the menu shipped 22px wide. */
+.voice-picker-trigger { width:100%; text-align:left; }
+.voice-picker-trigger .setrow-value { margin-left:auto; }
+.popover.agent-voice-picker[data-menu-surface] { overflow:hidden; display:flex; flex-direction:column; padding-bottom:12px; }
+.agent-voice-picker .surface-heading, .agent-voice-picker .surface-handle { flex:none; }
+.voice-picker-help { flex:none; padding:4px 16px 12px; margin:0; line-height:1.5; }
+.voice-picker-list { flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; padding:0 8px; }
+.voice-picker-row { display:flex; align-items:center; gap:4px; border-radius:14px; }
+.voice-picker-row:has([aria-pressed="true"]) { background:var(--paper-hover-alpha); }
+.voice-picker-choice { display:grid; grid-template-columns:minmax(0,1fr) auto 20px; align-items:center; gap:12px; flex:1; min-width:0; min-height:52px; padding:8px 12px; border:0; border-radius:14px; background:transparent; color:var(--paper-ink); font:inherit; text-align:left; }
+.voice-picker-name { font-size:15px; font-weight:600; }
+.voice-picker-gender { font-size:12px; color:var(--paper-ink-3); }
+.voice-picker-check { display:flex; align-items:center; justify-content:center; }
+.voice-picker-play { flex:none; width:44px; height:44px; margin-right:4px; }
+.voice-picker-play:disabled { opacity:.35; }
+@media (hover: hover) { .voice-picker-choice:hover { background:var(--paper-hover-alpha); } }
+.voice-picker-choice:focus-visible, .voice-picker-play:focus-visible { outline:2px solid var(--paper-ink); outline-offset:-3px; }
+.speakglyphs { display: flex; align-items: center; gap: 2px; flex: none; position: relative; }
+.popover.speakmenu {
+  min-width: 260px;
+}
+.speakmenu .setrow-value { color: var(--paper-ink); }
+/* A row's line under its word wraps here rather than ending in an ellipsis: its
+ * last words are how long the take takes to make, which is what says whether a
+ * tap makes or plays, and a 360px menu cut it at "takes ab…" (2026-10-04). The
+ * shared `.setrow-sub` keeps its one line for Settings; the menu hangs from its
+ * bottom edge, or its top when `.down`, so a second line grows it away from the
+ * glyph, and the row's tile stays centred on the taller text. */
+.speakmenu .setrow-sub { white-space: normal; overflow: visible; text-overflow: clip; }
+.speech-choice { margin-block: 4px; }
+/* Availability belongs to the audio icon, on the ordinary menu surface.
+ * Keep its action ink paired with its fill in every theme and during playback. */
+.speech-choice.available .setrow .icon-tile { background: var(--latte-foam); color: var(--latte-foam-ink); }
+.speech-choice-actions { display: flex; align-items: center; gap: 2px; }
+.speech-choice .setrow { flex: 1; min-width: 0; }
+.speech-regenerate {
+  flex: none; align-self: stretch; min-height: 44px; padding: 10px; margin: 6px 6px 6px 0;
+  border: 0; border-radius: 12px; background: transparent; color: var(--paper-ink);
+  font: 600 12px/1.4 var(--font-body); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+@media (hover: hover) { .speech-regenerate:hover { background: var(--paper-hover); } }
+.speech-regenerate:focus-visible { outline: 2px solid var(--paper-ink); outline-offset: -2px; }
+.speech-regenerate[aria-disabled=true] { cursor: wait; text-decoration: none; }
+.file-speech-regenerate { align-self: center; margin: 4px 0 0; }
+.speech-regeneration-note { padding: 4px 14px 10px; color: var(--paper-ink-2); font-size: 12px; line-height: 1.5; }
+@media (forced-colors: active) { .speech-choice.available .icon-tile { outline: 2px solid Highlight; } }
+.speakbtn.open { color: var(--paper-ink-3); background: var(--paper-hover-alpha); }
+.speakbtn {
+  border: 0; background: transparent; color: var(--paper-ink-3); border-radius: 8px;
+  width: 30px; height: 26px; display: flex; align-items: center; justify-content: center;
+  font-family: inherit;
+}
+.speakbtn.on { color: var(--paper-ink); background: var(--paper-hover-alpha); }
+@media (hover: hover) { .speakbtn:hover { color: var(--paper-ink-3); background: var(--paper-card); } }
+.speakbtn:active { background: var(--paper-pressed); }
+/* On a phone the glyphs are a thumb's target: the box grows, the mark does not. */
+@media (pointer: coarse) { .speakbtn { width: 40px; height: 34px; } }
+/* What the glyph says before the tap (2026-10-04): a quiet dot at its shoulder
+ * when a take is ready and the tap plays at once; a small turning ring while one
+ * is being made, stilled under reduced motion; nothing when there is none. */
+.speakbtn { position: relative; }
+.speakbtn.ready::after, .speakbtn.making::after {
+  content: ''; position: absolute; top: 3px; right: 4px; box-sizing: border-box; pointer-events: none;
+}
+.speakbtn.ready::after { width: 6px; height: 6px; border-radius: 999px; background: var(--latte-espresso); }
+.speakbtn.making::after {
+  width: 8px; height: 8px; border-radius: 999px; border: 1.5px solid var(--paper-ink-3); border-top-color: transparent;
+  animation: loamSpin .9s linear infinite;
+}
+@media (pointer: coarse) { .speakbtn.ready::after, .speakbtn.making::after { top: 5px; right: 8px; } }
+@media (prefers-reduced-motion: reduce) { .speakbtn.making::after { animation: none; border-top-color: var(--paper-ink-3); opacity: .7; } }
+
+/* The player: the composer's quiet two-row box, under the turn line. Row one
+ * is the kicker and ✕; row two is the control — ▶, the track, the time, the
+ * rate — or the stage while the file is made, or one sentence and Retry.
+ *
+ * Its air is the composer's: that box's 6px plus its draft's own inset puts the
+ * first letter 14px in and 13px down, so the player's kicker sits at 16px in
+ * and 12px down, and the box reads as the composer's sibling rather than a
+ * tighter cousin of it. The owner, 2026-10-02: "a little bit more padding or
+ * spacing or white space within the box". */
+.playerline { flex-direction: column; align-items: stretch; animation: loamFadeIn .18s ease-out; }
+.player { display: flex; flex-direction: column; gap: 6px; outline: none; border-radius: 18px; }
+.player:focus-visible .player-box { border-color: var(--paper-ink-3); }
+.player-box {
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--paper-pane); border: 1px solid var(--paper-rule); border-radius: 18px;
+  padding: 12px 12px 12px 16px; min-width: 0;
+}
+.player-top { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.player-kicker { flex: 1; min-width: 0; color: var(--paper-ink-3); font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player.failed .player-kicker { color: var(--paper-ink-3); }
+.player-close {
+  flex: none; width: 28px; height: 28px; border: 0; border-radius: 999px; background: transparent;
+  color: var(--paper-ink-3); display: flex; align-items: center; justify-content: center;
+}
+@media (hover: hover) { .player-close:hover { background: var(--paper-hover-alpha); color: var(--paper-ink); } }
+.player-close:active { background: var(--paper-pressed); }
+.player-row { display: flex; align-items: center; gap: 10px; min-height: 40px; min-width: 0; }
+.player-play {
+  flex: none; width: 40px; height: 40px; margin-left: -4px; border: 0; border-radius: 999px;
+  background: var(--latte-espresso); color: var(--latte-espresso-ink); display: flex; align-items: center; justify-content: center;
+}
+@media (hover: hover) { .player-play:hover { filter: brightness(1.08); } }
+.player-play:active { transform: scale(.96); }
+/* 44px on the phone, the platform's own minimum target. */
+@media (pointer: coarse) { .player-play { width: 44px; height: 44px; } }
+
+/* The track. `--at` and `--buf` are fractions, written as custom properties
+ * through `dress()` — never a style attribute, which the page's CSP refuses.
+ * The hit area is the row's height; the line itself is four pixels. */
+.player-track {
+  --at: 0; --buf: 0;
+  position: relative; flex: 1; min-width: 60px; height: 28px; cursor: pointer; touch-action: none;
+}
+.player-track::before, .player-buffered, .player-fill {
+  content: ''; position: absolute; left: 0; top: 50%; height: 4px; margin-top: -2px; border-radius: 999px;
+}
+.player-track::before { right: 0; background: var(--paper-pressed); }
+.player-buffered { width: calc(var(--buf) * 100%); background: var(--paper-rule); }
+.player-fill { width: calc(var(--at) * 100%); background: var(--latte-espresso); }
+.player-knob {
+  position: absolute; top: 50%; left: calc(var(--at) * 100%); width: 12px; height: 12px; margin: -6px 0 0 -6px;
+  border-radius: 999px; background: var(--latte-espresso); box-shadow: 0 0 0 3px var(--paper-pane);
+  transition: transform .12s ease;
+}
+.player-track:active .player-knob { transform: scale(1.25); }
+/* While the file is made: no knob, no buffer; a fill once progress is above
+ * nothing, and until then one calm band moving across, as the cleaning take
+ * draws it. The band is the track's own `::after` and never the fill, so the
+ * fill is at nought under it and grows from the left when the first part is
+ * voiced — a fill that had been the band would shrink from full instead. */
+.player-track.waiting { cursor: default; }
+.player-track.waiting .player-fill { transition: width .6s ease; background: var(--paper-ink-3); }
+.player-track.unknown::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; border-radius: 999px;
+  background: linear-gradient(90deg, transparent 0%, var(--paper-ink-3) 50%, transparent 100%);
+  background-size: 45% 100%; background-repeat: no-repeat; animation: loamShimmer 2.6s ease-in-out infinite;
+}
+.player-stage { flex: none; font-size: 13px; color: var(--paper-ink-3); font-style: italic; }
+.player-time { flex: none; font-size: 12px; color: var(--paper-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.player-rate {
+  flex: none; min-width: 44px; height: 30px; padding: 0 10px; border: 0; border-radius: 999px;
+  background: var(--latte-foam); color: var(--latte-foam-ink); font: inherit; font-size: 12px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+@media (hover: hover) { .player-rate:hover { background: var(--latte-hover);  color:var(--latte-foam-ink); } }
+.player-rate:active { background: var(--latte-hover);  color:var(--latte-foam-ink); }
+.player-error { flex: 1; min-width: 0; font-size: 13px; color: var(--paper-ink-3); line-height: 1.35; }
+.player-retry {
+  flex: none; height: 32px; padding: 0 14px; border: 0; border-radius: 999px;
+  background: var(--latte-foam); color: var(--latte-foam-ink); font: inherit; font-size: 13px; font-weight: 600;
+}
+@media (hover: hover) { .player-retry:hover { background: var(--latte-hover);  color:var(--latte-foam-ink); } }
+.player-retry:active { background: var(--latte-hover);  color:var(--latte-foam-ink); }
+/* The brief, folded under the box, set in the thread's own type when open. */
+.player-brief { display: flex; flex-direction: column; gap: 4px; padding: 0 4px; }
+.player-briefbtn {
+  align-self: flex-start; display: flex; align-items: center; gap: 4px; border: 0; background: transparent;
+  color: var(--paper-ink-3); font: inherit; font-size: 12px; padding: 2px 6px; border-radius: 8px;
+}
+.player-briefbtn svg { transition: transform .15s ease; }
+.player-briefbtn.open svg { transform: rotate(180deg); }
+@media (hover: hover) { .player-briefbtn:hover { background: var(--paper-card); color: var(--paper-ink); } }
+.player-briefbtn:active { background: var(--paper-hover-alpha); }
+.player-brieftext { padding: 2px 6px 4px; }
+/* On the phone — below the desktop's 1100px, the width `app.js` draws the
+ * desktop at — a ready row is two rows, because scrubbing back to the sentence
+ * missed is what the player is for and one line left the track a third of the
+ * box. Row one is ▶ and the track to the box's right edge; row two is the time
+ * at the left and the rate at the right. The track's min-width is the row less
+ * ▶ and the gap with room to spare, so the time can never share its line, and
+ * it grows into the rest. Preparing and failed keep their one line. */
+@media not all and (min-width: 1100px) {
+  .player.ready .player-row { flex-wrap: wrap; row-gap: 8px; }
+  .player.ready .player-track { min-width: calc(100% - 64px); }
+  .player.ready .player-rate { margin-left: auto; }
+}
+/* A phone's narrowest rows keep a little more room for what shares a line. */
+@media (max-width: 420px) {
+  .player-row { gap: 8px; }
+}
+/* The docked bar: the same player, under the header of whatever screen is up,
+ * while its row is not on the screen. It takes its own height in the column —
+ * nothing under it is covered — on the header's own frosted ground, with a
+ * hairline of progress along its foot that seeks where it is tapped. One line
+ * of words, and the chat's title is what gives way first. */
+.playerbar-slot { flex: none; position: relative; z-index: 3; }
+.playerbar {
+  position: relative; display: flex; align-items: center; gap: 8px;
+  min-height: 56px; padding: 4px 8px 6px 12px;
+  background: var(--paper-page-glass); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--paper-rule);
+  animation: loamFadeIn .18s ease-out;
+}
+.playerbar-play {
+  flex: none; width: 44px; height: 44px; border: 0; border-radius: 999px;
+  background: var(--paper-card); color: var(--paper-card-ink); display: flex; align-items: center; justify-content: center;
+}
+.playerbar-close { width: 44px; height: 44px; }
+.playerbar-play:active { transform: scale(.96); }
+/* The bar's making form: a turning ring where ▶ would be, the same size. */
+.playerbar-spin {
+  flex: none; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+}
+.playerbar-spin::before {
+  content: ''; width: 14px; height: 14px; box-sizing: border-box; border-radius: 999px;
+  border: 2px solid var(--paper-ink-3); border-top-color: transparent; animation: loamSpin .9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .playerbar-spin::before { animation: none; border-top-color: var(--paper-ink-3); opacity: .7; } }
+.playerbar-text {
+  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; border: 0; background: transparent;
+  color: var(--paper-ink); font: inherit; font-size: 13.5px; text-align: left; padding: 8px 4px; border-radius: 10px;
+  white-space: nowrap;
+}
+.playerbar-who { flex: none; font-weight: 600; }
+.playerbar-sep { flex: none; color: var(--paper-ink-3); }
+.playerbar-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--paper-ink-3); }
+.playerbar-text:active { background: var(--paper-hover-alpha); }
+/* Neutral surfaces keep these controls recognizable in every panel, including
+ * when a different pane owns the primary/secondary action colours. */
+.playerbar .playerbar-rate { height: 32px; min-width: 48px; background: var(--paper-card); color: var(--paper-card-ink); }
+/* The bar's own border is the empty line; the fill is drawn over it. The hit
+ * area is ten pixels of the bar's foot, which is what a tap to seek needs. */
+.playerbar-track { --at: 0; position: absolute; left: 0; right: 0; bottom: -1px; height: 10px; cursor: pointer; touch-action: none; }
+.playerbar-fill { position: absolute; left: 0; bottom: 0; height: 2px; width: calc(var(--at) * 100%); background: var(--latte-espresso); }
+@media (hover: hover) {
+  .playerbar-play:hover, .playerbar .playerbar-rate:hover { background: var(--paper-hover); color: var(--paper-hover-ink); }
+  .playerbar-text:hover { background: var(--paper-card); }
+}
+.playerbar-play:active, .playerbar .playerbar-rate:active { background: var(--paper-highlight); color: var(--paper-highlight-ink); }
+/* The speed pill joins play and close at the phone's 44px touch minimum. */
+@media (pointer: coarse) {
+  .playerbar .playerbar-rate { height: 44px; }
+}
+.chat-head + .playerbar-slot .playerbar { padding-left: 18px; padding-right: 20px; }
+@media (prefers-reduced-motion: reduce) {
+  .playerbar { animation: none; }
+  .playerline { animation: none; }
+  .player-track.unknown::after { animation: none; opacity: .6; }
+  .player-knob, .player-briefbtn svg, .player-track.waiting .player-fill { transition: none; }
+}
+
+/* Settings → Chats → Read aloud: two labelled steppers. */
+.readaloud-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.readaloud-label { font-size: 15px; color: var(--paper-ink); }
+.readaloud .stepvalue { min-width: 96px; }
+
+/* Scope the card's positioning to .sheet: .file-speech is also the desktop
+ * dialog wrapper, which must stay absolute and outside the page's flex flow. */
+.sheet.file-speech {
+  gap: 0;
+  /* The shared menu surface keeps its padding and arrival animation. */
+}
+.dialog > .sheet.file-speech { position: relative; width: 460px; padding: 30px; animation-name: readDialogIn; }
+.sheet.file-speech.leaving { animation: readSheetOut 220ms ease-in both; pointer-events: none; }
+.dialog > .sheet.file-speech.leaving { animation-name: readDialogOut; }
+.file-speech-scrim { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: loamFadeIn 240ms ease-out both; }
+.file-speech-scrim.leaving { animation: readFadeOut 220ms ease-in both; }
+.file-speech .sheet-top { margin-bottom: 10px; }
+.file-speech .sheet-head { padding-right: 24px; gap: 6px; }
+.file-speech .sheet-head .note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.file-speech .file-speech-close { position: absolute; top: 40px; right: 18px; width: 40px; height: 40px; color: var(--paper-ink-3); }
+.dialog .file-speech-close { top: 23px; right: 20px; }
+.file-speech-close::after {
+  content: attr(data-tooltip); position: absolute; top: calc(100% + 6px); right: 0;
+  padding: 4px 9px; border-radius: 8px; background: var(--latte-espresso); color: var(--latte-espresso-ink);
+  font-size: 12px; opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 120ms ease, visibility 120ms ease;
+}
+@media (hover: hover) {
+  .file-speech-close:hover::after { opacity: 1; visibility: visible; transition-delay: 600ms; }
+}
+.file-speech-choice { display: grid; text-align: center; color: var(--paper-ink); margin: 34px 0 24px; }
+.file-speech-value { grid-area: 1 / 1; animation: readValueIn 160ms ease-out both; }
+.file-speech-value.previous { animation: readValueOut 160ms ease-in both; }
+.file-speech-value .display { font-size: clamp(30px, 5vw, 38px); line-height: 1.2; }
+.file-speech-kind { color: var(--paper-ink-3); font-size: 13px; margin-top: 8px; }
+.file-speech-range { height: 76px; position: relative; margin: 0 8px 22px; }
+.file-speech-rail { position: absolute; left: 12px; right: 12px; top: 20px; height: 4px; border-radius: 999px; background: var(--paper-rule-strong); }
+.file-speech-fill { height: 100%; width: calc(var(--at) * 100%); border-radius: inherit; background: var(--latte-espresso); transition: width 200ms cubic-bezier(.2, .8, .2, 1.12); }
+.file-speech-slider { position: absolute; inset: 0 0 auto; width: 100%; height: 44px; margin: 0; opacity: 0; cursor: grab; touch-action: pan-x; }
+.file-speech-slider:active { cursor: grabbing; }
+.file-speech-thumb {
+  position: absolute; width: 24px; height: 24px; top: 10px;
+  left: calc(12px + var(--at) * (100% - 24px)); transform: translateX(-50%);
+  background: var(--latte-espresso); border: 4px solid var(--paper-pane); border-radius: 999px;
+  box-shadow: 0 2px 8px var(--shadow-ink); pointer-events: none;
+  transition: left 200ms cubic-bezier(.2, .8, .2, 1.12), transform 160ms ease;
+}
+.file-speech-slider:active ~ .file-speech-thumb { transform: translateX(-50%) scale(1.22); }
+.file-speech-slider:focus-visible:not([data-focus-muted]) ~ .file-speech-thumb {
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--paper-ink-2) 18%, transparent), 0 0 16px color-mix(in srgb, var(--paper-ink-2) 14%, transparent), 0 2px 8px var(--shadow-ink);
+}
+@media (forced-colors: active) {
+  .file-speech-slider:focus-visible:not([data-focus-muted]) ~ .file-speech-thumb { outline: 2px solid Highlight; outline-offset: 4px; }
+}
+.file-speech-stops { position: absolute; top: 44px; left: 12px; right: 12px; color: var(--paper-ink-3); font-size: 12px; pointer-events: none; }
+.file-speech-stops span { position: absolute; transform: translateX(-50%); white-space: nowrap; padding-top: 10px; transition: color 160ms ease; }
+.file-speech-stops span::before { content: ''; position: absolute; top: -10px; left: 50%; width: 2px; height: 5px; border-radius: 2px; background: var(--paper-rule-strong); }
+.file-speech-range.dense { height: 110px; }
+.file-speech-range.dense .file-speech-stops span:nth-child(3n + 2) { padding-top: 28px; }
+.file-speech-range.dense .file-speech-stops span:nth-child(3n) { padding-top: 46px; }
+.file-speech-stops .on { color: var(--paper-ink); font-weight: 700; }
+.file-speech-stops .on::before { background: var(--latte-espresso); }
+.file-speech .file-speech-action { display: grid; place-items: center; height: 52px; min-height: 52px; padding: 0 20px; overflow: hidden; }
+.file-speech-action[aria-disabled='true'] { cursor: wait; }
+.speech-action-state { grid-area: 1 / 1; display: flex; align-items: center; justify-content: center; gap: 10px; opacity: 0; transform: translateY(10px) scale(.96); transition: opacity 180ms ease, transform 220ms cubic-bezier(.2, .8, .2, 1); pointer-events: none; }
+.file-speech-action[data-phase='prepare'] .prepare,
+.file-speech-action[data-phase='making'] .making,
+.file-speech-action[data-phase='ready'] .ready { opacity: 1; transform: none; }
+.file-speech-action .wave { color: inherit; width: 24px; height: 22px; gap: 2px; }
+.file-speech-action .wave i { width: 3px; height: 10px; animation-duration: 1600ms; }
+.file-speech-action .wave i:nth-child(2) { animation-delay: -200ms; }
+.file-speech-action .wave i:nth-child(3) { animation-delay: -400ms; }
+.file-speech-action .wave i:nth-child(4) { animation-delay: -600ms; }
+.file-speech-action .wave i:nth-child(5) { animation-delay: -800ms; }
+.file-speech .warn { margin-bottom: 16px; }
+@keyframes readSheetIn { from { opacity: 0; transform: translateY(32px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes readDialogIn { from { opacity: 0; transform: translateY(16px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes readSheetOut { to { opacity: 0; transform: translateY(32px) scale(.98); } }
+@keyframes readDialogOut { to { opacity: 0; transform: translateY(16px) scale(.96); } }
+@keyframes readFadeOut { to { opacity: 0; } }
+@keyframes readValueIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes readValueOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) {
+  .sheet.file-speech, .dialog > .sheet.file-speech, .file-speech-scrim, .file-speech-value,
+  .file-speech-action .wave i { animation: none !important; }
+  .file-speech-value.previous { visibility: hidden; }
+  .file-speech-thumb, .file-speech-fill, .speech-action-state, .file-speech-stops span { transition: none !important; }
+}
+.fs-player { margin: 0 20px 14px; flex: none; }
+.read-aloud-voice { display: flex; flex-direction: column; gap: 8px; }
+.read-aloud-voice .setrow-value { margin-left:auto; }
+.read-aloud-preview { align-self: flex-start; min-height: 44px; }
+.file-speech .file-speech-close { color:var(--latte-foam-ink); }
+[data-menu-surface].voice-menu { width:300px; }
