@@ -18,7 +18,11 @@ export function activate(loam) {
   // whenever the app reads its health, and when the page comes back.
   const refreshHealth = () => Promise.resolve().then(() => (host.fetch ?? fetch)('/x/read-aloud/status', { headers: { accept: 'application/json' } }))
     .then(res => res.ok ? res.json() : null).catch(() => null)
-    .then(status => { if (!disposed) { local.speechOn = status?.speech === true; host.schedule() } })
+    .then(status => {
+      // Redrawn only when the answer changed: this runs on every health read.
+      const on = status?.speech === true
+      if (!disposed && on !== local.speechOn) { local.speechOn = on; host.schedule() }
+    })
   refreshHealth()
   loam.events.on('plugin.secrets.changed', ({ id }) => { if (id === 'read-aloud') refreshHealth() })
   loam.events.on('health.changed', refreshHealth)

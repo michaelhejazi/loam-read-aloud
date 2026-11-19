@@ -46,7 +46,7 @@ In your Loam, open Settings › Market, find Read aloud, and press
 **Install**. Or install it from Settings › Plugins with its link:
 
 ```
-https://github.com/michaelhejazi/loam-read-aloud/tree/v1.1.1
+https://github.com/michaelhejazi/loam-read-aloud/tree/v1.1.2
 ```
 
 ## For builders
