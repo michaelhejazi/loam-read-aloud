@@ -19,14 +19,15 @@ player that keeps going while you move around Loam.
 ## What you need
 
 A Google (Gemini) API key, saved once in Settings › Connections › API keys
-(or one for Read aloud alone, with "use a different key" on the same page). Without one, the controls
-say that audio is unavailable and keep your choices for later.
+(or one for Read aloud alone, with "use a different key" on the same page).
+Without one, the controls say that audio is unavailable and keep your
+choices for later.
 
 ## What it touches
 
 - **generativelanguage.googleapis.com**: the text of a reply or a note goes
-  there from this plugin's own server on your Loam, which holds the key, only when you ask
-  to hear it. The browser never sees the key.
+  there from this plugin's own server on your Loam, which holds the key,
+  only when you ask to hear it. The browser never sees the key.
 - **Conversation records, read only**: the replies it reads.
 - **Each agent's voice**, kept by your Loam with the agent's profile, so
   your agents can change it too.
@@ -45,7 +46,7 @@ In your Loam, open Settings › Market, find Read aloud, and press
 **Install**. Or install it from Settings › Plugins with its link:
 
 ```
-https://github.com/michaelhejazi/loam-read-aloud/tree/v1.1.0
+https://github.com/michaelhejazi/loam-read-aloud/tree/v1.1.1
 ```
 
 ## For builders

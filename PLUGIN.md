@@ -1,7 +1,7 @@
 ---
 id: read-aloud
 name: Read aloud
-version: 1.1.0
+version: 1.1.1
 author: Michael Hejazi
 api: 0
 kind: [extension]
