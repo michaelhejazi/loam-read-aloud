@@ -2,7 +2,7 @@
 //
 // A person may hear an agent's reply rather than read it — often on the
 // phone, often while doing something else. The server makes the audio
-// (`/api/speech`); this file is the part of the page that has to be right
+// (`/x/read-aloud/speech`, server/app.js); this file is the part of the page that has to be right
 // without a browser: which words make up a reply, how many there are, and the
 // device's settings for it. `app.js` draws the glyphs and the player from these.
 //

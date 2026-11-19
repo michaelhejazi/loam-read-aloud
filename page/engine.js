@@ -1,3 +1,6 @@
+
+// This plugin's own server, through Loam's plugin gateway (server/app.js).
+const SERVER = '/x/read-aloud/'
 // Mounted once. Cross-module state and operations are explicit host services.
 export function mount(host) {
 const { agentLook, onNode, h, icon, kept, wave, morph, authExpired, fetch, DOCUMENT_STYLE, documentWords, documentStops, VOICE_SAMPLE, fileNameOf, takeLine, barWho, rateLabel, speechClock, nextRate, menuSurface, markdown } = host
@@ -262,7 +265,7 @@ function queueLookup(t) {
 
 
 
-// **The server is the truth about what exists.** `POST /api/speech/lookup`
+// **The server is the truth about what exists.** `POST /x/read-aloud/speech/lookup`
 // takes the body a POST would and starts nothing; it answers ready with the
 // file, preparing, or none. A Ready the server has forgotten — swept after its
 // TTL, or lost to a restart — goes back to none here, before a tap could find
@@ -275,7 +278,7 @@ async function lookupTake(t) {
   let res
   let body = null
   try {
-    res = await fetch('/api/speech/lookup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(speechBody(t)) })
+    res = await fetch(`${SERVER}speech/lookup`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(speechBody(t)) })
     body = await res.json().catch(() => null)
   } catch {
     t.looking = false
@@ -831,7 +834,7 @@ async function requestSpeech(t, { play = false } = {}) {
   let res
   let body = null
   try {
-    res = await fetch('/api/speech', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(speechBody(t)) })
+    res = await fetch(`${SERVER}speech`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(speechBody(t)) })
     body = await res.json().catch(() => null)
   } catch {
     if (takeAlive(t)) failSpeech(t, 'The request for speech did not reach this app’s server.')
@@ -871,14 +874,14 @@ async function regenerateSpeech(t) {
   const poll = async (id) => {
     if (!takeAlive(t) || !t.regenerating) return
     try {
-      const res = await fetch(`/api/speech/${encodeURIComponent(id)}`)
+      const res = await fetch(`${SERVER}speech/${encodeURIComponent(id)}`)
       accept(res.status, await res.json().catch(() => null))
     } catch {
       if (takeAlive(t)) t.timer = setTimeout(() => poll(id), SPEECH_POLL_MS)
     }
   }
   try {
-    const res = await fetch('/api/speech', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...speechBody(t), force: true }) })
+    const res = await fetch(`${SERVER}speech`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...speechBody(t), force: true }) })
     accept(res.status, await res.json().catch(() => null))
   } catch { if (takeAlive(t)) fail('The request did not reach the server.') }
 }
@@ -888,7 +891,7 @@ async function pollSpeech(t) {
   let res
   let body = null
   try {
-    res = await fetch(`/api/speech/${encodeURIComponent(t.id)}`)
+    res = await fetch(`${SERVER}speech/${encodeURIComponent(t.id)}`)
     body = await res.json().catch(() => null)
   } catch {
     // A poll that did not arrive is asked again; the file is still being made.

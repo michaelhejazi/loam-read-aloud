@@ -12,10 +12,16 @@ export function activate(loam) {
   const context = loam.ui.extension({ state: local, store, helpers: { ...speech, ...documentSpeech, speechClock: speech.clock } })
   const host = context.host, service = context.attach(mount(host))
   let disposed = false
-  const refreshHealth = () => loam.data.request('GET', '/health').then(health => { if (!disposed) { local.speechOn = health?.speech === true; host.schedule() } }).catch(() => {})
+  // Whether a take can be made here is this plugin's own server's answer
+  // (`/x/read-aloud/status`): false without a Google key, the encoder or
+  // somewhere to keep the audio, and then nothing is drawn. It is asked again
+  // whenever the app reads its health, and when the page comes back.
+  const refreshHealth = () => Promise.resolve().then(() => (host.fetch ?? fetch)('/x/read-aloud/status', { headers: { accept: 'application/json' } }))
+    .then(res => res.ok ? res.json() : null).catch(() => null)
+    .then(status => { if (!disposed) { local.speechOn = status?.speech === true; host.schedule() } })
   refreshHealth()
   loam.events.on('plugin.secrets.changed', ({ id }) => { if (id === 'read-aloud') refreshHealth() })
-  loam.events.on('health.changed', health => { local.speechOn = health?.speech === true; host.schedule() })
+  loam.events.on('health.changed', refreshHealth)
   loam.events.on('page.visible', refreshHealth)
   const voicePicker = createVoicePicker({ ui: loam.ui, redraw: () => host.schedule(), pauseSpeech: () => service.pauseSpeech() })
   loam.places.agent.profile.add({ id: 'read-aloud.voice', render: context => voicePicker.render(context) })

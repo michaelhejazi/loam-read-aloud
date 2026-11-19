@@ -19,13 +19,13 @@ player that keeps going while you move around Loam.
 ## What you need
 
 A Google (Gemini) API key, saved once in Settings › Connections › API keys
-(or a key of Read aloud's own in its settings). Without one, the controls
+(or one for Read aloud alone, with "use a different key" on the same page). Without one, the controls
 say that audio is unavailable and keep your choices for later.
 
 ## What it touches
 
 - **generativelanguage.googleapis.com**: the text of a reply or a note goes
-  there through your Loam's server, which holds the key, only when you ask
+  there from this plugin's own server on your Loam, which holds the key, only when you ask
   to hear it. The browser never sees the key.
 - **Conversation records, read only**: the replies it reads.
 - **Each agent's voice**, kept by your Loam with the agent's profile, so
@@ -45,19 +45,23 @@ In your Loam, open Settings › Market, find Read aloud, and press
 **Install**. Or install it from Settings › Plugins with its link:
 
 ```
-https://github.com/michaelhejazi/loam-read-aloud/tree/v1.0.1
+https://github.com/michaelhejazi/loam-read-aloud/tree/v1.1.0
 ```
 
 ## For builders
 
 [PLUGIN.md](PLUGIN.md) is its manifest, with the voices as an
-`agent_settings` field. It is page code only, plain ES modules with no build
-step: `page/main.js` registers the reply footer, the Files action, the player
-and the settings through Loam's plugin interface (API 0). Speech is made by
-your Loam server's `/api/speech`, which has the key; this plugin holds none.
-`samples/` holds the voice samples the profile plays, one short take per
-voice. Loam's own repository runs this plugin's tests against its copy in
-`plugins/_listed/read-aloud/`.
+`agent_settings` field. Plain ES modules with no build step and no
+dependency: `page/main.js` registers the reply footer, the Files action, the
+player and the settings through Loam's plugin interface (API 0). `server/` is
+its own small server (Node's standard library and `ffmpeg`), which Loam runs
+while the plugin is on and reaches at `/x/read-aloud/`: it makes the speech,
+keeps the audio for a while in the plugin's private folder, and holds the
+key; the page holds none. Each agent's voice is the one chosen on its
+profile, else the `voices` setting (`agent=Voice:character;…`, under
+Advanced). `samples/` holds the voice samples the profile plays, one short
+take per voice. Needs Loam 0.2.3 or later. Loam's own repository runs this
+plugin's tests against its copy in `plugins/_listed/read-aloud/`.
 
 ## Made by
 
