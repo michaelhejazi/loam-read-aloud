@@ -74,7 +74,7 @@ is instant. Agent voices are on each agent's profile.
 In Settings › Plugins, with its link:
 
 ```
-https://github.com/michaelhejazi/loam-read-aloud/tree/v1.1.3
+https://github.com/michaelhejazi/loam-read-aloud/tree/v1.1.4
 ```
 
 ### For builders
