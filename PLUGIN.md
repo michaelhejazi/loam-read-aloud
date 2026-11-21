@@ -1,7 +1,7 @@
 ---
 id: read-aloud
 name: Read aloud
-version: 1.2.0
+version: 1.2.1
 author: Michael Hejazi
 api: 0
 kind: [extension]
@@ -44,7 +44,7 @@ Press the speaker under a reply or in Files and choose Listen. With no key, the 
 
 ## What you need, and what leaves your server
 
-Loam uses a Google key first, then an OpenAI key, then the browser. A provider error stays with that provider. Open Settings › Plugins › Read aloud to see the provider. Follow the free Gemini key link, sign in to Google AI Studio, create a key and paste it in the guide. Loam checks it and saves it in Settings › Connections › API keys for both plugins.
+Loam uses a Google key first, then an OpenAI key, then the browser. A provider error stays with that provider. Open Settings › Plugins › Read aloud to see the provider. When the plugin is using this browser, follow the free Gemini key link, sign in to Google AI Studio, create a key and paste it in the guide. Loam checks it and saves it in Settings › Connections › API keys for both plugins.
 
 Eligible projects get a free quota without setting up billing. Google may use free-tier audio and text to improve its products. Check [availability](https://aistudio.google.com/docs/available-regions) and [your limits](https://aistudio.google.com/rate-limit).
 
