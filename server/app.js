@@ -26,7 +26,7 @@ export function createReadAloudServer({ config, speech, log = { info() {}, warn(
 
     if (rest === '/status' && method === 'GET') {
       const spoken = await speech.status()
-      return sendJson(res, 200, { speech: spoken.available, reason: spoken.reason ?? null })
+      return sendJson(res, 200, { speech: spoken.available, reason: spoken.reason ?? null, provider: spoken.provider })
     }
 
     // Whether a take exists, with the same body as the POST, starting nothing:

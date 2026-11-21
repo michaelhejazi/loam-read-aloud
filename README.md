@@ -15,47 +15,48 @@ you chose for that agent. Your notes in Files can be read aloud too.
 ![It plays under the reply, and keeps going while you move around](assets/shots/read-aloud-playing.webp)
 *It plays under the reply, and keeps going while you move around.*
 
-![Give each agent a voice of its own; hear a sample first](assets/shots/read-aloud-voice.webp)
-*Give each agent a voice of its own; hear a sample first.*
+![Choose a Google voice and hear its sample](assets/shots/read-aloud-voice.webp)
+*Choose a Google voice and hear its sample.*
+![Add one shared Gemini key in Settings](assets/shots/read-aloud-guide.webp)
+*Add one shared Gemini key in Settings.*
 <!-- /loam:gallery -->
 
 ## What you can do
 
-- **Hear any reply.** Press Listen and it's read to you in that agent's own
-  voice.
+- **Hear any reply.** Press Listen and it's read to you in the selected voice, or the device voice without a key.
 - **Get the gist in seconds.** Brief turns a long reply into a short spoken
   summary.
 - **Listen to your notes.** Any note in Files can be read aloud, and the
   player keeps going while you move around Loam.
-- **A voice for each agent.** Thirty to choose from, with a sample of each
-  on the agent's profile. Files has a voice of its own.
+- **A voice for each agent.** Google has thirty sampled voices. OpenAI maps those choices to its smaller voice set and shows the voice it will use. Files has a voice of its own.
 - **Tables and diagrams, explained.** Instead of reading cells out, it tells
   you what they show (or skips them, if you prefer).
 
 ## How to use it
 
-1. Get it from **Settings › Market › Read aloud**.
-2. Add a Google (Gemini) key in **Settings › Connections › API keys**.
-3. Press the speaker under a reply, then **Listen** or **Brief**.
+Press the speaker under a reply or in Files and choose Listen. With no key, the player uses your browser’s voice and reads the fixed skip notices for tables and diagrams. A server key adds Brief and generated descriptions.
+
+Open Settings › Plugins › Read aloud to see the provider. Follow the free Gemini key link, sign in to Google AI Studio, create a key and paste it in the guide. Loam checks it and saves it in Settings › Connections › API keys for both plugins.
 
 ## What you need, and what leaves your server
 
-A Google (Gemini) API key, saved once in Loam (or one for Read aloud alone,
-with "use a different key" on the same page). Without one, the controls say
-that audio is unavailable and keep your choices for later.
+Loam uses a Google key first, then an OpenAI key, then the browser. A provider error stays with that provider. Listen sends reply or file text to the selected provider. Browser voices can be local or use a browser-managed speech service. Server-generated audio is cached on your server. Browser speech is played on demand.
 
-The text of a reply or a note goes to Google from your own Loam server, only
-when you press play, and your key never reaches the browser.
+Eligible projects can use Google’s free quota without setting up billing. Google may use free-tier inputs and outputs to improve its products. Quotas vary by project and model. Google restricts API use to eligible regions and professional or business development. Serving users in the EEA, Switzerland or the UK requires paid services. [Google terms](https://aistudio.google.com/docs/terms) · [Available regions](https://aistudio.google.com/docs/available-regions) · [Project limits](https://aistudio.google.com/rate-limit)
 
 ---
+
+Version 1.2 adds an optional OpenAI key and a connection to api.openai.com. Browser voices may contact their own speech service. Loam asks you to review this new access when updating.
 
 ## Technical details
 
 ### What it touches
 
-- **generativelanguage.googleapis.com**: the text of a reply or a note goes
+- **api.openai.com** handles reply or file text for narration, summaries and descriptions when OpenAI is selected.
+- **generativelanguage.googleapis.com** when Google is selected: the text of a reply or a note goes
   there from this plugin's own server on your Loam, which holds the key,
-  only when you ask to hear it. The browser never sees the key.
+  only when you ask to hear it. The server supplies the key on that request.
+- **Browser speech services** may receive text when the device voice needs a network connection.
 - **Conversation records, read only**: the replies it reads.
 - **Each agent's voice**, kept by your Loam with the agent's profile, so
   your agents can change it too.
@@ -74,7 +75,7 @@ is instant. Agent voices are on each agent's profile.
 In Settings › Plugins, with its link:
 
 ```
-https://github.com/michaelhejazi/loam-read-aloud/tree/v1.1.4
+https://github.com/michaelhejazi/loam-read-aloud/tree/v1.2.0
 ```
 
 ### For builders
