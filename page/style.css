@@ -347,11 +347,16 @@
 .file-speech .file-speech-close { color:var(--latte-foam-ink); }
 [data-menu-surface].voice-menu { width:300px; }
 
-.speech-provider { display: grid; gap: .35rem; }
-.speech-key-link { display: block; width: fit-content; border: 0; background: transparent; color: var(--muted, currentColor); font: inherit; font-size: .82rem; padding: .25rem 0; text-align: left; text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
-.speech-key-guide { color: var(--ink, CanvasText); background: var(--paper, Canvas); border: 1px solid var(--line, GrayText); border-radius: 16px; width: min(25rem, 92vw); max-height: 90dvh; padding: 1.4rem; }
-.speech-key-guide::backdrop { background: rgb(0 0 0 / .45); }
-.speech-key-guide form { display: grid; gap: .8rem; }
-.speech-key-guide :is(h2,p) { margin: 0; }
-.speech-key-guide input { color: inherit; background: transparent; padding: .7rem; border: 1px solid var(--line, GrayText); border-radius: 8px; }
-.speech-key-guide [hidden] { display: none; }
+.speech-provider { padding: var(--space-lg) var(--space-xl); gap: var(--space-xs); }
+.speech-key-link { width: fit-content; text-align: start; }
+.speech-key-form { padding: 0 var(--space-xs) var(--space-xs); gap: var(--space-lg); }
+.speech-key-form p, .speech-key-success h3 { margin: 0; }
+.speech-key-form > p:first-child { font-size: 15px; line-height: 1.5; }
+.speech-key-form .speech-studio { display: inline-flex; align-self: flex-start; align-items: center; justify-content: center; gap: var(--space-sm); text-decoration: none; }
+.speech-key-form .keys-check:empty { display: none; }
+.speech-key-success { display: grid; justify-items: center; gap: var(--space-md); padding: var(--space-lg); text-align: center; }
+.speech-key-check { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--latte-espresso); color: var(--latte-espresso-ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .speech-key-check { animation: speechKeyConnected 280ms var(--ease-standard) both; }
+  @keyframes speechKeyConnected { from { transform: scale(.76); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+}
