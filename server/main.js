@@ -7,9 +7,9 @@
 
 import fs from 'node:fs'
 import { readConfig } from './config.js'
-import { createSpeech } from './speech.js'
+import { speechProviders } from './providers.js'
 import { createReadAloudServer, agentVoiceFrom } from './app.js'
-import { createLog, keyFrom } from './http.js'
+import { createLog } from './http.js'
 
 const config = readConfig()
 const log = createLog({ level: config.logLevel })
@@ -35,7 +35,7 @@ config.speech.voicesNow = voicesNow
 
 const agentVoice = agentVoiceFrom(config)
 
-const speech = createSpeech(config, { log, getKey: keyFrom(config.keysFile, 'GEMINI_API_KEY') })
+const speech = speechProviders(config, { log })
 const { server } = createReadAloudServer({ config, speech, log, agentVoice })
 Promise.all([speech.start(), speech.chooseModel()])
   .catch((err) => log.error({ event: 'speech-config', message: String(err?.message ?? err) }))

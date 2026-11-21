@@ -346,3 +346,12 @@
 .read-aloud-preview { align-self: flex-start; min-height: 44px; }
 .file-speech .file-speech-close { color:var(--latte-foam-ink); }
 [data-menu-surface].voice-menu { width:300px; }
+
+.speech-provider { display: grid; gap: .35rem; }
+.speech-key-link { display: block; width: fit-content; border: 0; background: transparent; color: var(--muted, currentColor); font: inherit; font-size: .82rem; padding: .25rem 0; text-align: left; text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
+.speech-key-guide { color: var(--ink, CanvasText); background: var(--paper, Canvas); border: 1px solid var(--line, GrayText); border-radius: 16px; width: min(25rem, 92vw); max-height: 90dvh; padding: 1.4rem; }
+.speech-key-guide::backdrop { background: rgb(0 0 0 / .45); }
+.speech-key-guide form { display: grid; gap: .8rem; }
+.speech-key-guide :is(h2,p) { margin: 0; }
+.speech-key-guide input { color: inherit; background: transparent; padding: .7rem; border: 1px solid var(--line, GrayText); border-radius: 8px; }
+.speech-key-guide [hidden] { display: none; }

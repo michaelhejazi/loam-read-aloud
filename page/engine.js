@@ -2,6 +2,8 @@
 // This plugin's own server, through Loam's plugin gateway (server/app.js).
 const SERVER = '/x/read-aloud/'
 // Mounted once. Cross-module state and operations are explicit host services.
+import { BrowserAudio } from './browser-audio.js'
+import { openAIVoices } from './openai-voices.js'
 export function mount(host) {
 const { agentLook, onNode, h, icon, kept, wave, morph, authExpired, fetch, DOCUMENT_STYLE, documentWords, documentStops, VOICE_SAMPLE, fileNameOf, takeLine, barWho, rateLabel, speechClock, nextRate, menuSurface, markdown } = host
 
@@ -116,7 +118,7 @@ function speechWord(mode) {
 }
 
 function speechKicker(t) {
-  return `${speechWord(t.mode)} · ${t.agentName}`
+  return `${speechWord(t.mode)} · ${t.agentName}${t.provider === 'openai' ? ' · OpenAI generated voice' : ''}`
 }
 
 const takeKeyOf = (chatId, mode, text, request = null) => `${chatId}\n${mode}\n${text}${request && Object.keys(request).length ? `\n${JSON.stringify(request)}` : ''}${mode === 'verbatim' ? `\ndescribe:${host.store.readAloud.describeTablesAndDiagrams !== false}` : ''}`
@@ -142,7 +144,7 @@ function takeState(t) {
 function setModes(set) {
   const out = []
   if (set.words >= host.state.speech.listenFrom) out.push('verbatim')
-  if (set.words >= host.state.speech.briefFrom) out.push('brief')
+  if (host.state.provider !== 'browser' && set.words >= host.state.speech.briefFrom) out.push('brief')
   return out
 }
 
@@ -191,7 +193,9 @@ function newTake(set, mode, context = null) {
     agentName: context?.name ?? (look.name || open.agent || ''),
     title: typeof record?.title === 'string' ? record.title : '',
     text: set.text,
-    phase: 'none',
+    browser: host.state.provider === 'browser',
+    provider: host.state.provider,
+    phase: host.state.provider === 'browser' ? 'ready' : 'none',
     stage: null,
     progress: null,
     id: null,
@@ -250,7 +254,7 @@ function glyphTakes(set) {
 }
 
 function lookupDue(t, freshMs) {
-  if (authExpired() || t.looking || t.regenerating || !(t.phase === 'none' || t.phase === 'ready')) return false
+  if (t.browser || authExpired() || t.looking || t.regenerating || !(t.phase === 'none' || t.phase === 'ready')) return false
   if (t.started && t.audio && !t.audio.ended) return false
   return Date.now() - t.checkedAt > freshMs
 }
@@ -305,7 +309,7 @@ async function lookupTake(t) {
 }
 
 function speechBody(t) {
-  return { chat_id: t.chatId, agent: t.agent, mode: t.mode, title: t.title, text: t.text, ...t.request,
+  return { ...(t.provider ? { provider: t.provider } : {}), chat_id: t.chatId, agent: t.agent, mode: t.mode, title: t.title, text: t.text, ...t.request,
     ...(t.mode === 'verbatim' ? { describe_tables_and_diagrams: t.describeTablesAndDiagrams } : {}) }
 }
 
@@ -344,7 +348,7 @@ function fileSpeech(file = host.files.st.file) {
   }
   return {
     glyph: h('button', { class: 'iconbtn fs-speak', type: 'button', title: 'Read aloud', 'aria-label': 'Read aloud', 'aria-haspopup': 'dialog', onclick: (event) => {
-      const stops = documentStops(words)
+      const stops = documentStops(words).filter(s => host.state.provider !== 'browser' || s.mode === 'verbatim')
       const brief = stops.findIndex((s) => s.minutes === 3)
       host.openSheet({ kind: 'file-speech', file: { root: f.root, path: f.path }, title: fileNameOf(f.path), text: f.text, words, stops, at: brief < 0 ? stops.length - 1 : brief, returnFocus: event.currentTarget })
       const sheet = host.state.sheet
@@ -390,7 +394,7 @@ function fileSpeechSheet(sheet) {
     h('div', { class: 'file-speech-choice', 'aria-live': 'polite', 'aria-atomic': 'true' },
       sheet.previousAt !== undefined ? choice(sheet.stops[sheet.previousAt], true) : null,
       choice(stop)),
-    h('div', { class: `file-speech-range${sheet.stops.length > 7 ? ' dense' : ''}`, style: { '--at': String(sheet.stops.length > 1 ? sheet.at / (sheet.stops.length - 1) : 1) } },
+    t.browser ? null : h('div', { class: `file-speech-range${sheet.stops.length > 7 ? ' dense' : ''}`, style: { '--at': String(sheet.stops.length > 1 ? sheet.at / (sheet.stops.length - 1) : 1) } },
       h('div', { class: 'file-speech-rail', 'aria-hidden': 'true' }, h('div', { class: 'file-speech-fill' })),
       h('input', { class: 'file-speech-slider', id: 'listening-minutes', type: 'range', min: '0', max: String(sheet.stops.length - 1), step: '1', value: String(sheet.at),
       'aria-label': 'Listening minutes', 'aria-valuetext': `${stop.label} · ${kind(stop)}`, 'aria-disabled': sheet.stops.length === 1 ? 'true' : null,
@@ -410,6 +414,7 @@ function fileSpeechSheet(sheet) {
       h('span', { class: 'file-speech-thumb', 'aria-hidden': 'true' }),
       h('div', { class: 'file-speech-stops', 'aria-hidden': 'true' }, ...sheet.stops.map((s, i) => h('span', { class: i === sheet.at ? 'on' : '', style: { left: `${sheet.stops.length > 1 ? i / (sheet.stops.length - 1) * 100 : 100}%` }, text: s.short }))),
     ),
+    t.browser ? host.guide.link() : null,
     phase === 'failed' ? h('div', { class: 'note warn', role: 'alert', text: t.error }) : null,
     h('button', { class: 'primary file-speech-action', type: 'button', 'data-phase': action, 'aria-disabled': phase === 'making' ? 'true' : null,
       'aria-label': phase === 'making' ? 'Preparing audio' : ready ? (phase === 'playing' ? 'Pause' : 'Play') : phase === 'failed' ? 'Try again' : 'Prepare',
@@ -422,7 +427,7 @@ function fileSpeechSheet(sheet) {
       h('span', { class: 'speech-action-state prepare', 'aria-hidden': 'true' }, icon.speaker(18), h('span', { text: phase === 'failed' ? 'Try again' : 'Prepare' })),
       h('span', { class: 'speech-action-state making', 'aria-hidden': 'true' }, wave(), h('span', { text: 'Preparing' })),
       h('span', { class: 'speech-action-state ready', 'aria-hidden': 'true' }, phase === 'playing' ? icon.pause(18) : icon.play(18), h('span', { text: phase === 'playing' ? 'Pause' : 'Play' }))),
-    ready ? h('button', { class: 'speech-regenerate file-speech-regenerate', type: 'button',
+    ready && !t.browser ? h('button', { class: 'speech-regenerate file-speech-regenerate', type: 'button',
       'aria-label': `Regenerate ${stop.label} audio`, 'aria-disabled': String(Boolean(t.regenerating)),
       onclick: () => regenerateSpeech(t) }, h('span', { text: t.regenerating ? 'Regenerating…' : 'Regenerate' })) : null,
     t.regenerating || t.regenerationMessage ? h('div', { class: 'speech-regeneration-note', role: 'status', text: regenerationLine(t) }) : null,
@@ -433,7 +438,7 @@ function fileSpeechSheet(sheet) {
 function focusFileSpeech() {
   const sheet = host.state.sheet
   if (sheet?.kind !== 'file-speech' || sheet.focused) return
-  const slider = host.root.querySelector?.('.file-speech-slider')
+  const slider = host.root.querySelector?.('.file-speech-slider') ?? host.root.querySelector?.('.file-speech-action')
   if (!slider) return
   sheet.focused = true
   slider.focus({ preventScroll: true })
@@ -478,7 +483,7 @@ const MARK_WORDS = { ready: 'Read aloud, ready to play', making: 'Read aloud, be
 // The one glyph a set has earned at this device's thresholds, or nothing.
 function speechGlyph(set) {
   if (!host.state.speechOn || !set.context) return null
-  if (set.words < host.state.speech.listenFrom && set.words < host.state.speech.briefFrom) return null
+  if (!setModes(set).length) return null
   const key = setKey(set)
   const list = glyphTakes(set)
   const mark = setMark(list)
@@ -553,7 +558,7 @@ function speechMenu(set) {
     main.setAttribute('aria-label', `${ready ? 'Play or pause' : 'Prepare'} ${speechWord(mode)} audio. ${row.sub}`)
     return h('div', { class: `speech-choice${ready ? ' available' : ''}`, key: mode, role: 'presentation' },
       h('div', { class: 'speech-choice-actions', role: 'presentation' }, main,
-        ready ? h('button', { class: 'speech-regenerate', type: 'button', role: 'menuitem',
+        ready && !t.browser ? h('button', { class: 'speech-regenerate', type: 'button', role: 'menuitem',
           'aria-label': `Regenerate ${speechWord(mode)} audio`, 'aria-disabled': String(Boolean(t.regenerating)),
           onclick: () => regenerateSpeech(t) }, h('span', { text: t.regenerating ? 'Regenerating…' : 'Regenerate' })) : null),
       t?.regenerating || t?.regenerationMessage ? h('div', { class: 'speech-regeneration-note', role: 'status', text: regenerationLine(t) }) : null)
@@ -573,7 +578,7 @@ function speechMenu(set) {
     menuSurface(h(
       'div',
       { class: 'popover speakmenu', key: 'speakmenu', role: 'menu', 'aria-label': 'Read aloud' },
-      ...rows,
+      ...rows, host.state.provider === 'browser' ? host.guide.link() : null,
     ), { title: 'Read aloud', close: () => { host.state.speakMenu = null; host.schedule() } }),
   ]
 }
@@ -798,7 +803,7 @@ function drawBar(t) {
       { class: 'player-close playerbar-close', key: 'close', type: 'button', title: 'Stop and close', 'aria-label': 'Stop and close', onclick: () => closeTake(t) },
       icon.close(11),
     ),
-    h(
+    t.browser ? null : h(
       'div',
       {
         class: 'playerbar-track',
@@ -825,6 +830,7 @@ function drawBar(t) {
 // a dictation is recording, under which nothing starts. A take that is made
 // after a wait is never played by this.
 async function requestSpeech(t, { play = false } = {}) {
+  if (t.browser) { t.phase = 'ready'; return startPlay(t) }
   t.revision = (t.revision ?? 0) + 1
   clearTimeout(t.timer)
   dropAudio(t)
@@ -995,11 +1001,11 @@ function settleReady(t, body, { fresh, preserveAudio = false }) {
 function ensureAudio(t) {
   if (t.audio) return t.audio
   const Audio = globalThis.Audio
-  if (typeof Audio !== 'function') {
+  if (!t.browser && typeof Audio !== 'function') {
     failSpeech(t, 'This browser cannot play audio.')
     return null
   }
-  const audio = new Audio()
+  const audio = t.browser ? new BrowserAudio(t) : new Audio()
   t.audio = audio
   audio.preload = 'auto'
   const redraw = () => {
@@ -1018,7 +1024,7 @@ function ensureAudio(t) {
     })
   }
   audio.addEventListener('error', () => {
-    if (t.audio === audio) audioFailed(t)
+    if (t.audio === audio) { if (t.browser) failSpeech(t, 'This browser could not speak the text. Check its voice settings and try again.'); else audioFailed(t) }
   })
   audio.src = t.url
   applyRate(audio)
@@ -1066,7 +1072,7 @@ async function audioFailed(t) {
 // the tap that asked for it; a refusal is not a fault: the row shows ▶ and the
 // next tap is inside a tap.
 function startPlay(t) {
-  if ((host.recordingAny?.() ?? host.state.rec?.phase === 'recording') || !takeAlive(t) || t.phase !== 'ready' || !t.url) return
+  if ((host.recordingAny?.() ?? host.state.rec?.phase === 'recording') || !takeAlive(t) || t.phase !== 'ready' || (!t.url && !t.browser)) return
   host.audioSessionType('playback')
   const audio = ensureAudio(t)
   if (!audio) return
@@ -1103,7 +1109,7 @@ function speechDuration(t) {
 
 function seekTo(t, seconds) {
   const audio = t?.audio
-  if (!audio) return
+  if (!audio || t.browser) return
   const total = speechDuration(t)
   const at = Math.max(0, typeof total === 'number' ? Math.min(total, seconds) : seconds)
   audio.currentTime = at
@@ -1126,6 +1132,7 @@ function dropAudio(t) {
   t.audio = null
   try {
     audio.pause()
+    audio.release?.()
     audio.removeAttribute?.('src')
     audio.load?.()
   } catch {
@@ -1318,7 +1325,7 @@ function drawTake(t) {
         },
         playing ? icon.pause(16) : icon.play(16),
       ),
-      h(
+      t.browser ? h('span', { class: 'player-time', text: 'Browser voice' }) : h(
         'div',
         {
           class: 'player-track',
@@ -1349,7 +1356,8 @@ function drawTake(t) {
         h('div', { class: 'player-fill' }),
         h('div', { class: 'player-knob' }),
       ),
-      h('span', { class: 'player-time', text: `${speechClock(ended ? total : now)} / ${speechClock(total)}` }),
+
+      t.browser ? null : h('span', { class: 'player-time', text: `${speechClock(ended ? total : now)} / ${speechClock(total)}` }),
       h('button', {
         class: 'player-rate',
         key: 'rate',
@@ -1403,9 +1411,10 @@ function settingsReadAloud({ back = true } = {}) {
     player = h('div', { class: 'read-aloud-sample' }, kept(drawTake(t)))
   }
   return [
+    host.guide?.settings(host.state.provider),
     back ? host.settingsBack('Settings', 'root') : null,
     back ? host.settingsHead('Read aloud', 'The reading voice for this device.') : h('p', { class: 'note', text: 'Reading preferences for this device. Agent voices are in each agent’s profile.' }),
-    h('div', { class: 'rows' }, h('div', { class: 'setrow' },
+    host.state.provider === 'browser' ? h('p', { class: 'note', text: 'Listen reads with your browser’s voice. Tables and diagrams are skipped. A server key enables Brief.' }) : h('div', { class: 'rows' }, h('div', { class: 'setrow' },
       h('div', { class: 'setrow-who' }, h('div', { class: 'setrow-title', id: 'read-aloud-describe-label', text: 'Describe tables and diagrams' }),
         h('div', { class: 'setrow-sub', id: 'read-aloud-describe-hint', text: 'Instead of skipping them, Full gives a sentence or two on what they show.' })),
       h('button', { type: 'button', class: 'schedule-switch', role: 'switch', 'aria-labelledby': 'read-aloud-describe-label', 'aria-describedby': 'read-aloud-describe-hint',
@@ -1413,15 +1422,15 @@ function settingsReadAloud({ back = true } = {}) {
           host.store.readAloud = { ...host.store.readAloud, describeTablesAndDiagrams: host.store.readAloud.describeTablesAndDiagrams === false }
           host.schedule()
         } }, h('span')))),
-    h('div', { class: 'rows read-aloud-voice' },
+    host.state.provider === 'browser' ? null : h('div', { class: 'rows read-aloud-voice' },
       h('button', { class: 'setrow', id: 'files-voice', 'aria-label': 'Files voice', 'aria-haspopup': 'listbox', 'aria-expanded': String(Boolean(host.state.sheet?.voices)),
-        onclick: () => { host.state.sheet.voices = !host.state.sheet.voices; host.schedule() } }, h('span', { class: 'setrow-title', text: 'Files voice' }), h('span', { class: 'setrow-value', text: voice }), icon.chevronDown(16))),
+        onclick: () => { host.state.sheet.voices = !host.state.sheet.voices; host.schedule() } }, h('span', { class: 'setrow-title', text: 'Files voice' }), h('span', { class: 'setrow-value', text: host.state.provider === 'openai' ? openAIVoices[voice] : voice }), icon.chevronDown(16))),
     h('button', { class: 'pillbtn content-mark read-aloud-preview', type: 'button', disabled: !host.state.speechOn || phase === 'making', text: phase === 'making' ? 'Preparing sample…' : phase === 'ready' ? (isPlaying(t) ? 'Pause sample' : 'Play a sample') : 'Prepare a sample', onclick: () => {
       openRow(t)
       if (phase === 'ready') togglePlay(t)
       else requestSpeech(t, { play: true })
     } }),
-    !host.state.speechOn ? h('div', { class: 'note', text: 'Audio is unavailable on this server. Your voice choice is saved for when it is available.' }) : null,
+    !host.state.speechOn ? h('div', { class: 'note', text: host.state.provider === 'browser' ? 'This browser has no speech synthesis. A server key enables Listen.' : 'Audio is unavailable on this server. Your voice choice is saved for when it is available.' }) : null,
     player,
   ].filter(Boolean)
 }

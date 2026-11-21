@@ -1,3 +1,5 @@
+import { speechGuide } from './guide.js'
+import { openAIVoices } from './openai-voices.js'
 import { mount } from './engine.js'
 import * as speech from './speech.js'
 import * as documentSpeech from './document-speech.js'
@@ -7,34 +9,43 @@ import { createVoicePicker } from './voice-picker.js'
 export function activate(loam) {
   loam.ui.styles.add('page/style.css')
   const store = createPreferences(loam.settings)
-  const local = { speech: store.speech, speechOn: false, speakMenu: null }
+  const guide = speechGuide(loam, 'read-aloud', 'Get more voices with a free Gemini key')
+  const local = { provider: null, speech: store.speech, speechOn: false, speakMenu: null }
   Object.defineProperty(local, 'rec', { get: () => ['draft', 'editor', 'file'].map(target => loam.ui.host.fieldActivity(target)).find(state => state?.phase === 'recording') })
-  const context = loam.ui.extension({ state: local, store, helpers: { ...speech, ...documentSpeech, speechClock: speech.clock } })
+  const context = loam.ui.extension({ state: local, store, helpers: { ...speech, ...documentSpeech, guide, speechClock: speech.clock } })
   const host = context.host, service = context.attach(mount(host))
   let disposed = false
-  // Whether a take can be made here is this plugin's own server's answer
-  // (`/x/read-aloud/status`): false without a Google key, the encoder or
-  // somewhere to keep the audio, and then nothing is drawn. It is asked again
-  // whenever the app reads its health, and when the page comes back.
-  const refreshHealth = () => Promise.resolve().then(() => (host.fetch ?? fetch)('/x/read-aloud/status', { headers: { accept: 'application/json' } }))
+  // Recheck on key changes and visibility. A browser voice needs no encoder.
+  let revision = 0
+  const refreshHealth = () => { const ticket = ++revision; return Promise.resolve().then(() => (host.fetch ?? fetch)('/x/read-aloud/status', { headers: { accept: 'application/json' } }))
     .then(res => res.ok ? res.json() : null).catch(() => null)
     .then(status => {
       // Redrawn only when the answer changed: this runs on every health read.
-      const on = status?.speech === true
-      if (!disposed && on !== local.speechOn) { local.speechOn = on; host.schedule() }
-    })
+      if (disposed || ticket !== revision || !status) return
+      const provider = status.provider ?? (status.speech ? 'google' : null)
+      const on = provider === 'browser' ? Boolean(globalThis.speechSynthesis && globalThis.SpeechSynthesisUtterance) : status.speech === true
+      if (local.provider === provider && local.speechOn === on) return
+      if (local.provider && provider !== local.provider) {
+        for (const take of service.takes.values()) { clearTimeout(take.timer); service.closeTake(take) }
+        service.takes.clear(); voicePicker.close(); local.speakMenu = null
+        if (host.state.sheet?.kind === 'file-speech') host.closeSheet()
+      }
+      local.provider = provider; local.speechOn = on; host.schedule()
+    }) }
   refreshHealth()
+  loam.events.on('speech.keys.changed', refreshHealth)
+  loam.events.on('plugin.settings.opened', refreshHealth)
   loam.events.on('plugin.secrets.changed', ({ id }) => { if (id === 'read-aloud') refreshHealth() })
   loam.events.on('health.changed', refreshHealth)
   loam.events.on('page.visible', refreshHealth)
-  const voicePicker = createVoicePicker({ ui: loam.ui, redraw: () => host.schedule(), pauseSpeech: () => service.pauseSpeech() })
+  const voicePicker = createVoicePicker({ ui: loam.ui, guide, provider: () => local.provider, redraw: () => host.schedule(), pauseSpeech: () => service.pauseSpeech() })
   loam.places.agent.profile.add({ id: 'read-aloud.voice', render: context => voicePicker.render(context) })
   loam.places.message.footer.action.add({ id: 'read-aloud.footer', slot: 'row', order: 100, render: context => {
     const set = !context.mine && threadSpeechSet(context.thread, context.message, context.agentName, context.agent, loam.data.messages.parts(context.message))
     return set ? service.turnRow(context.leading, set, context.trailing) : context.view
   } })
   loam.places.files.viewer.add({ id: 'read-aloud.file', slot: 'action', render: context => service.fileSpeech(context.file) })
-  loam.places.settings.section.add({ id: 'read-aloud', group: 'plugin', title: 'Reading preferences', render: () => service.settingsReadAloud({ back: false }) })
+  loam.places.settings.section.add({ id: 'read-aloud', group: 'plugin', worksWithoutKeys: true, title: 'Reading preferences', render: () => service.settingsReadAloud({ back: false }) })
   loam.places.app.overlay.add({ id: 'read-aloud.player', slot: 'player', render: () => service.playerBar() })
   loam.places.app.overlay.add({ id: 'read-aloud.sheets', slot: 'sheet', render: ({ sheet }) => {
     if (sheet.kind === 'file-speech') {
@@ -45,7 +56,7 @@ export function activate(loam) {
       return [loam.ui.h('button', { class: `scrim file-speech-scrim${sheet.closing ? ' leaving' : ''}`, key: 'scrim', 'aria-label': 'Close', tabindex: '-1', onclick: close }), node]
     }
     if (sheet.kind !== 'settings' || !sheet.voices) return null
-    return loam.ui.menuSurface(loam.ui.h('div', { class: 'popover voice-menu', role: 'listbox' }, ...documentSpeech.PREBUILT_VOICES.map(voice => loam.ui.h('button', { class: 'setrow', role: 'option', 'aria-selected': String(voice === store.readAloud.voice), text: voice, onclick: () => {
+    return loam.ui.menuSurface(loam.ui.h('div', { class: 'popover voice-menu', role: 'listbox' }, ...documentSpeech.PREBUILT_VOICES.map(voice => loam.ui.h('button', { class: 'setrow', role: 'option', 'aria-selected': String(voice === store.readAloud.voice), text: local.provider === 'openai' ? voice + ' · ' + openAIVoices[voice] : voice, onclick: () => {
       const sample = service.documentTake({ sample: true, text: documentSpeech.VOICE_SAMPLE, title: 'Voice sample' })
       if (service.isPlaying(sample)) sample.audio.pause()
       store.readAloud = { ...store.readAloud, voice }; sheet.voices = false; host.schedule()
@@ -57,7 +68,7 @@ export function activate(loam) {
   loam.events.on('key.escape', event => { if (!event.defaultPrevented && local.speakMenu) { local.speakMenu = null; host.schedule(); event.preventDefault() } })
   const cleanup = () => {
     voicePicker.close()
-    disposed = true
+    guide.close(); disposed = true
     for (const take of service.takes.values()) { clearTimeout(take.timer); service.closeTake(take) }
     service.takes.clear(); service.rowsPlaced.clear(); service.rowWatch?.disconnect()
     if (host.state.sheet?.kind === 'file-speech') { host.state.sheet = null; host.schedule() }

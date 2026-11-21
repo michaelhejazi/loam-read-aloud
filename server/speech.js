@@ -470,7 +470,7 @@ class Refusal extends Error {
 export function createSpeech(
   config,
   {
-    fetchImpl = fetch,
+    fetchImpl = fetch, writeText, synthesize,
     getKey = async () => config.geminiApiKey || '',
     encoder = createFfmpegEncoder(config.speech.ffmpeg),
     log = { info() {}, warn() {}, error() {} },
@@ -502,7 +502,7 @@ export function createSpeech(
   const active = new Map()
   const requests = new Map()
   const descriptions = createBlockDescriber({ dir, model: s.briefModel, now,
-    generate: async (body, signal) => outputText(failIfNot(await call(body, descriptionTimeoutMs, signal), 'describing a table or diagram')) })
+    generate: writeText ?? (async (body, signal) => outputText(failIfNot(await call(body, descriptionTimeoutMs, signal), 'describing a table or diagram'))) })
   let ttsModel = s.ttsModel
   let state = { key: Boolean(config.geminiApiKey), encoder: false, storage: false }
   let started = null
@@ -542,7 +542,7 @@ export function createSpeech(
   // once to find out whether one has appeared since; it is used only when
   // SPEECH_TTS_MODEL was not set, and said either way.
   async function chooseModel() {
-    if (!await getKey()) return
+    if (synthesize || !await getKey()) return
     modelChosen ??= listModels()
     return modelChosen
   }
@@ -728,21 +728,25 @@ export function createSpeech(
     throw new SpeechError(`Gemini could not finish ${what} (${out.status})${said ? `: ${said}` : '.'}`)
   }
 
+  async function briefText(body, job, what) {
+    if (writeText) return writeText(body, AbortSignal.any([job.abort.signal, AbortSignal.timeout(BRIEF_TIMEOUT_MS)]))
+    return outputText(await callWithRetries(body, BRIEF_TIMEOUT_MS, job, what))
+  }
+
   async function writeBrief(job) {
     if (job.source === 'document') return writeDocumentBrief(job)
-    const body = await callWithRetries(
+    const raw = await briefText(
       {
         model: s.briefModel,
         system_instruction: briefInstruction(s.briefMaxWords),
         input: briefInput({ agent: job.agentName, title: job.title, text: job.text }),
         store: false,
       },
-      BRIEF_TIMEOUT_MS,
       job,
       'writing the brief',
     )
-    const text = cleanBrief(outputText(body), s.briefMaxWords)
-    if (text === '') throw new SpeechError('Gemini wrote an empty brief for this reply.')
+    const text = cleanBrief(raw, s.briefMaxWords)
+    if (text === '') throw new SpeechError((writeText ? 'OpenAI' : 'Gemini') + ' wrote an empty brief for this reply.')
     return text
   }
 
@@ -754,12 +758,12 @@ export function createSpeech(
     let previous = ''
     let count = 0
     for (let attempt = 0; attempt < 3; attempt++) {
-      const body = await callWithRetries({
+      const raw = await briefText({
         model: s.briefModel, system_instruction: instruction,
         input: `Document title: ${job.title || '(untitled)'}\n\nDocument:\n${withoutFrontmatter(job.text)}${previous ? `\n\nYour previous draft had ${count} words, outside the required range. Rewrite it to ${budget} words, preserving the document's important facts:\n${previous}` : ''}`,
         store: false,
-      }, BRIEF_TIMEOUT_MS, job, 'writing the document brief')
-      previous = speakable(outputText(body))
+      }, job, 'writing the document brief')
+      previous = speakable(raw)
       count = previous.match(/\S+/g)?.length ?? 0
       if (count >= min && count <= max) {
         job.report.brief_words = count
@@ -774,33 +778,39 @@ export function createSpeech(
     const words = chunk.match(/\S+/g)?.length ?? 0
     const spoken_words = spokenWords(chunk)
     for (let attempt = 1; attempt <= 2; attempt++) {
-      const body = await callWithRetries(
-        {
-          model: ttsModel,
-          input: [{
-            type: 'user_input',
-            content: [{
-              type: 'text',
-              text: chunk,
-              annotations: [{ type: 'speech_metadata', style: `${job.voice.character}, ${STYLE[job.mode]}` }],
-            }],
-          }],
-          response_format: { type: 'audio', mime_type: 'audio/wav', sample_rate: 24000 },
-          generation_config: { speech_config: [{ voice: job.voice.voice }] },
-          store: false,
-        },
-        CHUNK_TIMEOUT_MS,
-        job,
-        'voicing part of this',
-      )
-      const audio = outputAudio(body)
-      if (!audio) throw new SpeechError('Gemini answered with no audio for part of this.')
-      const part = pcmOfWav(Buffer.from(audio, 'base64'))
+      const part = synthesize
+        ? await synthesize({ chunk, voice: job.voice.voice, style: `${job.voice.character}, ${STYLE[job.mode]}`, signal: AbortSignal.any([job.abort.signal, AbortSignal.timeout(CHUNK_TIMEOUT_MS)]) })
+        : await googleChunk(job, chunk)
       const check = { ...durationCheck(spoken_words, part.pcm.length / 2 / part.rate, paceFor(job.voice.voice, job.mode)), words, spoken_words }
       job.report.chunk_checks.push({ chunk: index + 1, attempt, ...check })
       if (check.accepted) return { ...part, check }
     }
-    throw new SpeechError(CLEAN_SPEECH_ERROR)
+    throw new SpeechError(synthesize ? 'OpenAI could not prepare this narration cleanly. Try again.' : CLEAN_SPEECH_ERROR)
+  }
+
+  async function googleChunk(job, chunk) {
+    const body = await callWithRetries(
+      {
+        model: ttsModel,
+        input: [{
+          type: 'user_input',
+          content: [{
+            type: 'text',
+            text: chunk,
+            annotations: [{ type: 'speech_metadata', style: `${job.voice.character}, ${STYLE[job.mode]}` }],
+          }],
+        }],
+        response_format: { type: 'audio', mime_type: 'audio/wav', sample_rate: 24000 },
+        generation_config: { speech_config: [{ voice: job.voice.voice }] },
+        store: false,
+      },
+      CHUNK_TIMEOUT_MS,
+      job,
+      'voicing part of this',
+    )
+    const audio = outputAudio(body)
+    if (!audio) throw new SpeechError('Gemini answered with no audio for part of this.')
+    return pcmOfWav(Buffer.from(audio, 'base64'))
   }
 
   // ------------------------------------------------------------ a job
